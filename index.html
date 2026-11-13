@@ -1,47 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Daytona USA 2 · prototipo Fase 0</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="app.css">
-<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07080b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff3d1f'/%3E%3Ctext x='16' y='23' font-family='Arial Black,Arial' font-weight='900' font-style='italic' font-size='17' text-anchor='middle' fill='%23fff'%3E2%3C/text%3E%3C/svg%3E">
+<title>Daytona USA 2 · Power Edition</title>
+<link rel="stylesheet" href="./app.css">
 </head>
 <body>
-<header>
-  <h1>Daytona USA 2 <small>Power Edition · prototipo web Fase 1</small></h1>
-  <p class="aviso">Ejecuta la ROM original de Sega Model 3 con el núcleo de Supermodel compilado a WebAssembly.
-  Video con los renderizadores propios de Supermodel (New3D + 2D) sobre WebGL2, a la resolución que elijas. Con sonido (SCSP + DSB2).</p>
-</header>
-<main>
-  <section id="carga">
-    <p id="autostatus" class="nota" role="status">Preparando carga automática…</p>
-    <label class="archivo" id="elegir" hidden>Si falla la carga automática, elegí <code>dayto2pe.zip</code>
-      <input type="file" id="zip" accept=".zip"></label>
-    <p id="romguardada" class="nota" hidden></p>
-    <p><label>Resolución interna <select id="res">
-      <option value="1">496×384 (original)</option><option value="2" selected>992×768 (x2)</option>
-      <option value="3">1488×1152 (x3)</option><option value="4">1984×1536 (x4)</option></select></label></p>
-    <p class="nota">La ROM se descarga automáticamente desde este mismo sitio y se ejecuta en tu navegador. No necesitás seleccionar archivos.</p>
-  </section>
-  <section id="juego" hidden>
-    <canvas id="pantalla" width="992" height="768"></canvas>
-    <div id="estado">
-      <div><span>Velocidad</span><b id="fps">—</b></div>
-      <div><span>Costo por cuadro</span><b id="cpu">—</b></div>
-      <div><span>Cuadro</span><b id="frame">0</b></div>
-      <div><span>Saltos de cuadro</span><b id="skip">—</b></div>
-      <button id="bench">Medir sin límite (600 cuadros)</button>
-      <button id="resetnv">Borrar récords y ajustes guardados</button>
-      <div><span>Joystick</span><b id="pad">no conectado (tocá un botón)</b></div>
-      <p class="teclas">Teclado: 3 moneda · 1 start · ↑ acelerar · ↓ frenar · ← → volante · A S D F vistas · Q W E R marchas (MT) · 5 service · 6 test<br>
-      Joystick: palanca = volante · RT/LT = acelerador/freno · A B X Y = vistas · Start · Back = moneda · LB/RB = bajar/subir marcha</p>
-    </div>
-  </section>
-  <pre id="log"></pre>
+<!-- fondo animado (solo se ve en la pantalla de inicio) -->
+<div id="bg" aria-hidden="true"><i class="stripe s1"></i><i class="stripe s2"></i><i class="stripe s3"></i><div class="checker"></div><div class="lines"></div></div>
+
+<main id="stage">
+  <canvas id="screen" width="992" height="768" tabindex="0" aria-label="Pantalla del juego"></canvas>
+  <div id="crt" aria-hidden="true"></div>
+  <div id="fps" hidden></div>
 </main>
-<footer><p class="nota">Emulación: núcleo de <a href="https://github.com/trzy/Supermodel">Supermodel</a> (GPLv3) compilado a WebAssembly ·
-  <a href="codigo-fuente.zip">código fuente de esta versión</a> · Daytona USA 2 © SEGA, ROM incluida para uso privado; no redistribuir sin autorización.</p></footer>
-<script src="app.js"></script>
+
+<!-- barra flotante (se oculta sola mientras jugás) -->
+<nav id="dock" aria-label="Controles" hidden>
+  <button id="btnPause" title="Pausa (P)" aria-label="Pausa">❚❚</button>
+  <button id="btnMute" title="Sonido / silenciar (M)" aria-label="Silenciar">🔊</button>
+  <button id="btnFull" title="Pantalla completa (F11)" aria-label="Pantalla completa">⛶</button>
+  <button id="btnLocal" title="Multijugador local" aria-label="Multijugador local">2P</button>
+  <button id="btnRooms" title="Salas online" aria-label="Salas online">👥</button>
+  <button id="btnSettings" title="Ajustes" aria-label="Ajustes">⚙</button>
+</nav>
+
+<!-- pantalla de inicio / carga -->
+<section id="loader" class="overlay intro">
+  <div class="card hero">
+    <div class="flag" aria-hidden="true"></div>
+    <h1 class="logo"><span class="l1">DAYTONA</span><span class="l2">USA <b>2</b></span></h1>
+    <p class="edition">POWER EDITION</p>
+    <p id="loadText">Preparando…</p>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div id="loadActions" hidden>
+      <button class="btn primary big" id="btnPlay" hidden>▶ JUGAR</button>
+      <label class="btn" id="btnPick">Elegir <code>dayto2pe.zip</code><input id="zipPick" type="file" accept=".zip" hidden></label>
+      <p class="hint" id="romInfo">Elegí el zip o arrastralo a cualquier parte de la página. Se lee en tu equipo y no se sube a ningún lado; queda guardado en este navegador para la próxima.</p>
+    </div>
+    <p class="credits">Emulación: núcleo de <a href="https://github.com/trzy/Supermodel" target="_blank" rel="noopener">Supermodel</a> (GPLv3) en WebAssembly · <a href="codigo-fuente.zip">código fuente</a></p>
+  </div>
+</section>
+<div id="drop" aria-hidden="true"><div>Soltá el <code>dayto2pe.zip</code> acá</div></div>
+
+<!-- pausa -->
+<section id="paused" class="overlay" hidden>
+  <div class="card"><h2>PAUSA</h2><p>El juego está detenido.</p>
+    <div class="row center"><button class="btn primary" id="btnResume">Seguir</button></div>
+  </div>
+</section>
+
+<!-- ajustes -->
+<aside id="settings" class="drawer" hidden aria-label="Ajustes">
+  <header><h2>Ajustes</h2><button class="x" data-close="settings" aria-label="Cerrar">✕</button></header>
+  <div class="scroll">
+    <section>
+      <h3>Juego</h3>
+      <div class="row"><button class="btn" id="btnRestart">Reiniciar la placa</button><label class="btn">Cargar otra ROM<input id="zipPick2" type="file" accept=".zip" hidden></label></div>
+      <div class="row"><button class="btn" id="btnResetNv">Borrar récords y ajustes del juego</button></div>
+      <p class="hint">El juego guarda récords y opciones del menú de servicio en su memoria (NVRAM). Se guarda en este navegador cada 20 segundos.</p>
+    </section>
+    <section>
+      <h3>Video</h3>
+      <label class="field">Escalado
+        <select id="optScale"><option value="fit">Ajustar a la ventana</option><option value="int">Múltiplo entero</option><option value="stretch">Estirar a pantalla completa</option></select></label>
+      <label class="field">Resolución 3D
+        <select id="optRes"><option value="auto">Automática (según tu pantalla)</option><option value="1">496×384 (original)</option><option value="2">992×768 (x2)</option><option value="3">1488×1152 (x3)</option><option value="4">1984×1536 (x4)</option></select></label>
+      <label class="field">Filtro
+        <select id="optFilter"><option value="suave">Suave</option><option value="nitido">Píxeles nítidos</option><option value="crt">Monitor CRT (líneas de barrido)</option></select></label>
+      <p class="hint" id="videoInfo"></p>
+      <p class="hint">La placa Model 3 dibuja a 496×384. Acá los autos y la pista se redibujan de verdad a la resolución elegida con tu placa de video; el HUD y los textos son los originales.</p>
+      <label class="check"><input type="checkbox" id="optFps"> Mostrar FPS</label>
+    </section>
+    <section>
+      <h3>Sonido</h3>
+      <label class="field">Volumen <span id="volVal"></span>
+        <input type="range" id="optVolume" min="0" max="100" step="1"></label>
+      <label class="check"><input type="checkbox" id="optMute"> Silenciar (M)</label>
+    </section>
+    <section>
+      <h3>Mando / joystick</h3>
+      <label class="field">Mando a usar
+        <select id="optPadIndex"><option value="auto">Automático</option><option value="0">Mando 1</option><option value="1">Mando 2</option><option value="2">Mando 3</option><option value="3">Mando 4</option></select></label>
+      <label class="field">Sensibilidad del volante <span id="sensVal"></span>
+        <input type="range" id="optSens" min="50" max="200" step="5"></label>
+      <p class="hint" id="padInfo">Ningún mando detectado (apretá un botón del mando).</p>
+      <p class="hint">Palanca: volante analógico · RT / LT: acelerador / freno analógicos · A B X Y: cámaras · Start: start · Back: moneda · LB / RB: bajar / subir marcha (caja manual).</p>
+    </section>
+    <section>
+      <h3>Rendimiento</h3>
+      <p class="hint" id="perfInfo">—</p>
+      <div class="row"><button class="btn" id="btnBench">Medir velocidad máxima</button></div>
+      <p class="hint">Si tu equipo no llega, el juego sigue a velocidad real y solo se saltean cuadros de dibujo («saltos»). Bajar la resolución 3D ayuda.</p>
+    </section>
+    <section>
+      <h3>Controles (teclado)</h3>
+      <table class="keys">
+        <tr><td><kbd>3</kbd></td><td>Moneda</td></tr>
+        <tr><td><kbd>1</kbd></td><td>Start</td></tr>
+        <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Volante</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Acelerar / frenar</td></tr>
+        <tr><td><kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd></td><td>Cámaras (VR1–VR4)</td></tr>
+        <tr><td><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd></td><td>Marchas 1–4 (manual)</td></tr>
+        <tr><td><kbd>5</kbd> / <kbd>6</kbd></td><td>Service / Test</td></tr>
+        <tr><td><kbd>P</kbd> · <kbd>M</kbd> · <kbd>F11</kbd></td><td>Pausa · silencio · pantalla completa</td></tr>
+      </table>
+    </section>
+    <section>
+      <h3>Diagnóstico</h3>
+      <label class="check"><input type="checkbox" id="optLog"> Mostrar registro técnico</label>
+      <div class="row"><button class="btn" id="btnSaveLog">Guardar registro</button></div>
+      <pre id="log" hidden></pre>
+    </section>
+  </div>
+</aside>
+
+<!-- multijugador local / online: próximamente -->
+<aside id="local" class="drawer" hidden aria-label="Multijugador local">
+  <header><h2>MULTIJUGADOR LOCAL</h2><button class="x" data-close="local" aria-label="Cerrar">✕</button></header>
+  <div class="scroll"><section class="soon"><span class="soon-badge">PRÓXIMAMENTE</span>
+    <h3>Dos jugadores en la misma PC</h3>
+    <p class="hint">Daytona 2 conecta las cabinas con su placa de red original. Primero va a llegar el modo de dos ventanas en la misma computadora.</p></section></div>
+</aside>
+<aside id="rooms" class="drawer" hidden aria-label="Salas online">
+  <header><h2>SALAS ONLINE</h2><button class="x" data-close="rooms" aria-label="Cerrar">✕</button></header>
+  <div class="scroll"><section class="soon"><span class="soon-badge">PRÓXIMAMENTE</span>
+    <h3>Carreras de 2 a 6 jugadores</h3>
+    <p class="hint">Salas por internet usando el link de cabinas del arcade original.</p></section></div>
+</aside>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="./app.js"></script>
 </body>
 </html>

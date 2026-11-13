@@ -8,6 +8,7 @@ onmessage = async (e) => {
   const m = e.data;
   if (m.t === 'boot') {
     const t0 = performance.now();
+    postMessage({ t: 'stage', s: 'Cargando el emulador…', p: 0.55 });
     M = await createD2({ print: log, printErr: log, locateFile: (p) => 'core/' + p });
     log(`[web] wasm listo en ${(performance.now() - t0).toFixed(0)} ms`);
     M.FS.mkdir('/rom');
@@ -34,6 +35,7 @@ onmessage = async (e) => {
     }
     const h = M.GL.registerContext(gl, { majorVersion: 2, minorVersion: 0, enableExtensionsByDefault: 1 });
     M.GL.makeContextCurrent(h);
+    postMessage({ t: 'stage', s: 'Armando la placa Model 3…', p: 0.75 });
     const rc = init('/rom/dayto2pe.zip', '/rom/Games.xml', '/rom/dayto2pe.nv');
     if (rc) { log(`[web] d2_init falló (${rc})`); postMessage({ t: 'fail' }); return; }
     canvas = m.canvas;
@@ -53,7 +55,8 @@ onmessage = async (e) => {
     }, 20000);
     running = true; loop();
   } else if (m.t === 'key') key && key(m.k, m.d ? 1 : 0);
-  else if (m.t === 'speed') running = !!m.on;
+  else if (m.t === 'speed') { running = !!m.on; next = 0; }
+  else if (m.t === 'reset' && M) M.ccall('d2_reset', null, [], []);
   else if (m.t === 'joy' && M) {
     for (const [a, v] of m.axes) M.ccall('d2_joy_axis', null, ['number', 'number'], [a, v]);
     for (const [b, d] of m.buttons) M.ccall('d2_joy_button', null, ['number', 'number'], [b, d ? 1 : 0]);
