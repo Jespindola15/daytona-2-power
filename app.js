@@ -143,25 +143,59 @@ addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; doc
 addEventListener('dragover', (e) => e.preventDefault());
 addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); if (!running) useFile(e.dataTransfer.files[0]); });
 
+// ---------- autocarga desde el hosting, sin selector obligatorio ----------
+let autoLoading = false;
+async function autoLoadRom() {
+  if (autoLoading || running) return;
+  autoLoading = true;
+  loadState('Descargando Daytona USA 2: Power Edition…', 0.03);
+  $('loadActions').hidden = true;
+  try {
+    const response = await fetch('data/dayto2pe.zip', { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status} al descargar la ROM`);
+    const type = response.headers.get('content-type') || '';
+    if (type.includes('text/html')) throw new Error('El servidor devolvió HTML en vez del ZIP de la ROM');
+    const total = Number(response.headers.get('content-length')) || 0;
+    let buf;
+    if (response.body && total > 0) {
+      const reader = response.body.getReader();
+      const parts = []; let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value); received += value.byteLength;
+        loadState(`Descargando ROM… ${(received / 1048576).toFixed(1)} MB / ${(total / 1048576).toFixed(1)} MB`, 0.03 + 0.27 * Math.min(1, received / total));
+      }
+      const bytes = new Uint8Array(received); let offset = 0;
+      for (const part of parts) { bytes.set(part, offset); offset += part.byteLength; }
+      buf = bytes.buffer;
+    } else {
+      buf = await response.arrayBuffer();
+    }
+    const header = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+    if (buf.byteLength < 1024 || header[0] !== 0x50 || header[1] !== 0x4b)
+      throw new Error('El archivo recibido no parece ser un ZIP válido');
+    log(`[web] ROM descargada automáticamente: ${(buf.byteLength / 1048576).toFixed(1)} MB`);
+    await boot(buf);
+  } catch (err) {
+    log('[web] Falló la autocarga: ' + err.message);
+    loadState('No se pudo cargar automáticamente la ROM.', 0);
+    $('loadActions').hidden = false;
+    $('romInfo').textContent = 'Falló la descarga de data/dayto2pe.zip. Podés elegir el archivo manualmente.';
+    const blob = await kvGet('rom');
+    if (blob) {
+      $('btnPlay').hidden = false;
+      $('btnPlay').onclick = async () => { startAudio(); boot(await blob.arrayBuffer()); };
+      $('romInfo').textContent += ' También hay una ROM guardada en este navegador.';
+    }
+    toast('Error de autocarga: revisá el hosting o elegí el ZIP', 5000);
+  } finally { autoLoading = false; }
+}
 (async function intro() {
   if (!('transferControlToOffscreen' in canvas) || !self.WebGL2RenderingContext) {
-    loadState('Este navegador no sirve: hace falta Google Chrome o Edge actualizados (WebGL2).', 0); return;
+    loadState('Hace falta Chrome o Edge actualizado con WebGL2.', 0); return;
   }
-  const name = await kvGet('romname');
-  loadState(name ? 'Todo listo para correr.' : 'Falta la ROM del juego.', name ? 0.25 : 0.05);
-  $('loadActions').hidden = false;
-  if (name) {
-    $('btnPlay').hidden = false;
-    $('btnPick').firstChild.textContent = 'Usar otra ROM ';
-    $('romInfo').textContent = `ROM guardada en este navegador: ${name}`;
-    $('btnPlay').onclick = async () => {
-      startAudio();
-      const blob = await kvGet('rom');
-      if (!blob) { toast('No encontré la ROM guardada: elegila de nuevo'); return; }
-      boot(await blob.arrayBuffer());
-    };
-    $('btnPlay').focus();
-  }
+  await autoLoadRom();
 })();
 
 // ---------- pausa / pantalla completa / paneles ----------
