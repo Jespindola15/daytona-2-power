@@ -1,0 +1,21 @@
+:root { color-scheme: dark; --bg:#0d0f14; --panel:#161a22; --txt:#e8e8ea; --dim:#9aa0ab; --acc:#e63b2e; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.5 system-ui, sans-serif; }
+header, main { max-width: 1000px; margin: 0 auto; padding: 16px 20px; }
+h1 { margin: 8px 0; font-size: 26px; } h1 small { display:block; font-size: 14px; color: var(--dim); font-weight: 400; }
+.aviso { background: var(--panel); border-left: 3px solid var(--acc); padding: 10px 14px; margin: 8px 0 0; }
+.archivo { display:inline-block; background: var(--acc); color:#fff; padding: 12px 18px; border-radius: 8px; cursor:pointer; font-weight:600; }
+.archivo input { display:none; } .nota { color: var(--dim); }
+#juego { display:flex; gap: 20px; flex-wrap: wrap; align-items:flex-start; }
+#juego[hidden] { display:none; }
+canvas { width: 744px; max-width:100%; aspect-ratio: 496/384; background:#000; border-radius: 6px; }
+#estado { flex: 1; min-width: 200px; display:grid; gap: 8px; }
+#estado div { background: var(--panel); padding: 8px 12px; border-radius: 6px; display:flex; justify-content:space-between; }
+#estado span { color: var(--dim); }
+button { background: var(--panel); color: var(--txt); border: 1px solid #2b313d; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+.teclas { color: var(--dim); font-size: 13px; }
+#log { background:#08090c; color:#b9c0cc; padding: 12px; border-radius: 6px; font-size: 12px; max-height: 260px; overflow:auto; white-space: pre-wrap; }
+
+button.archivo { border: 0; font: inherit; font-weight: 600; margin-right: 10px; }
+#elegir code { color: #fff; }
+footer { max-width: 1000px; margin: 0 auto; padding: 0 20px 24px; } footer a { color: #ff8a80; }

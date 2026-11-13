@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Daytona USA 2 · prototipo Fase 0</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<header>
+  <h1>Daytona USA 2 <small>Power Edition · prototipo web Fase 1</small></h1>
+  <p class="aviso">Ejecuta la ROM original de Sega Model 3 con el núcleo de Supermodel compilado a WebAssembly.
+  Video con los renderizadores propios de Supermodel (New3D + 2D) sobre WebGL2, a la resolución que elijas. Con sonido (SCSP + DSB2).</p>
+</header>
+<main>
+  <section id="carga">
+    <p id="autostatus" class="nota" role="status">Preparando carga automática…</p>
+    <label class="archivo" id="elegir" hidden>Si falla la carga automática, elegí <code>dayto2pe.zip</code>
+      <input type="file" id="zip" accept=".zip"></label>
+    <p id="romguardada" class="nota" hidden></p>
+    <p><label>Resolución interna <select id="res">
+      <option value="1">496×384 (original)</option><option value="2" selected>992×768 (x2)</option>
+      <option value="3">1488×1152 (x3)</option><option value="4">1984×1536 (x4)</option></select></label></p>
+    <p class="nota">La ROM se descarga automáticamente desde este mismo sitio y se ejecuta en tu navegador. No necesitás seleccionar archivos.</p>
+  </section>
+  <section id="juego" hidden>
+    <canvas id="pantalla" width="992" height="768"></canvas>
+    <div id="estado">
+      <div><span>Velocidad</span><b id="fps">—</b></div>
+      <div><span>Costo por cuadro</span><b id="cpu">—</b></div>
+      <div><span>Cuadro</span><b id="frame">0</b></div>
+      <div><span>Saltos de cuadro</span><b id="skip">—</b></div>
+      <button id="bench">Medir sin límite (600 cuadros)</button>
+      <button id="resetnv">Borrar récords y ajustes guardados</button>
+      <div><span>Joystick</span><b id="pad">no conectado (tocá un botón)</b></div>
+      <p class="teclas">Teclado: 3 moneda · 1 start · ↑ acelerar · ↓ frenar · ← → volante · A S D F vistas · Q W E R marchas (MT) · 5 service · 6 test<br>
+      Joystick: palanca = volante · RT/LT = acelerador/freno · A B X Y = vistas · Start · Back = moneda · LB/RB = bajar/subir marcha</p>
+    </div>
+  </section>
+  <pre id="log"></pre>
+</main>
+<footer><p class="nota">Emulación: núcleo de <a href="https://github.com/trzy/Supermodel">Supermodel</a> (GPLv3) compilado a WebAssembly ·
+  <a href="codigo-fuente.zip">código fuente de esta versión</a> · Daytona USA 2 © SEGA, ROM incluida para uso privado; no redistribuir sin autorización.</p></footer>
+<script src="app.js"></script>
+</body>
+</html>
