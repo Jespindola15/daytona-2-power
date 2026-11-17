@@ -1,6 +1,6 @@
 // Web Worker: hosts the WebAssembly Model 3 core (Supermodel, GPLv3) off the UI thread.
-importScripts('core/d2core.js');
-let M, canvas, videoInit, skip3d, userSkip = false, skipped = 0, run, key, frame = 0, running = false, timer = 0;
+importScripts('core/d2core.js', 'netlink.js');
+let M, link = null, waiting = false, canvas, videoInit, skip3d, userSkip = false, skipped = 0, run, key, frame = 0, running = false, timer = 0;
 const HZ = 57.524;                 // Model 3 refresh rate
 const log = (s) => postMessage({ t: 'log', s });
 
@@ -44,8 +44,14 @@ onmessage = async (e) => {
     const vr = videoInit(canvas.width, canvas.height);
     const se = M.ccall('d2_shader_errors', 'number', [], []);
     if (vr || se) { log(`[web] video init ${vr}, shaders con error: ${se}`); postMessage({ t: 'fail' }); return; }
+    if (m.link) {
+      // online: this cabinet is machine m.link.index of m.link.num on the relay's "cable"
+      link = new D2Link(M, (msg) => { const b = typeof msg === 'string' ? msg : msg.buffer; postMessage({ t: 'netout', msg: b }, typeof msg === 'string' ? [] : [b]); });
+      link.config(m.link.index, m.link.num, m.link.delay);
+      log(`[net] cabina ${m.link.index + 1} de ${m.link.num}, demora ${m.link.delay} cuadros`);
+    }
     postMessage({ t: 'ready' });
-    // Backup RAM (records, settings) goes back to the page every 20 s to be kept in IndexedDB.
+    if (!m.link) // Backup RAM (records, settings) goes back to the page every 20 s to be kept in IndexedDB.
     setInterval(() => {
       try {
         M.ccall('d2_save_nvram', null, ['string'], ['/rom/save.nv']);
@@ -62,12 +68,14 @@ onmessage = async (e) => {
     for (const [b, d] of m.buttons) M.ccall('d2_joy_button', null, ['number', 'number'], [b, d ? 1 : 0]);
   }
   else if (m.t === 'skip3d') { userSkip = !!m.on; skip3d(m.on ? 1 : 0); }
-  else if (m.t === 'bench') bench(m.n);
+  else if (m.t === 'bench' && !link) bench(m.n);
+  else if (m.t === 'net' && link) { link.onMessage(m.data); if (waiting) { waiting = false; clearTimeout(timer); loop(); } }
+  else if (m.t === 'netdrop' && link) { link.breakLink(); if (waiting) { waiting = false; clearTimeout(timer); loop(); } }
   else if (m.t === 'size' && canvas) { canvas.width = m.w; canvas.height = m.h; videoInit(m.w, m.h); }
 };
 
 // Paced loop: one emulated frame per 1/57.524 s; reports the real speed.
-let next = 0, acc = 0, accFrames = 0, accT = performance.now();
+let next = 0, waitT = 0, acc = 0, accFrames = 0, accT = performance.now();
 function loop() {
   if (!running) { timer = setTimeout(loop, 50); return; }
   const now = performance.now();
@@ -78,10 +86,18 @@ function loop() {
   const due = Math.min(4, Math.floor((now - next) / (1000 / HZ)) + 1);
   let n = 0;
   if (now >= next) for (; n < due; n++) {
+    // online: the frame waits until the other cabinets' data for it has arrived
+    if (link && !link.canRun()) { if (!waiting) { waiting = true; waitT = performance.now(); link.waits++; } break; }
+    if (waitT) { link.waitMs += performance.now() - waitT; waitT = 0; }
     const last = n === due - 1;
     if (!userSkip) skip3d(last ? 0 : 1);
+    if (link) link.beforeRun();
     acc += run(1); frame++; next += 1000 / HZ;
+    if (link) link.afterRun();
     if (!last) skipped++;
+  }
+  if (waiting && n) { // drew nothing new this task: make sure the last frame run is the one shown
+    if (!userSkip) skip3d(0);
   }
   if (now - next > 250) next = now;          // too slow: do not spiral
   if (n) {
@@ -95,11 +111,13 @@ function loop() {
     } else postMessage({ t: 'frame', frame });
   }
   if (now - accT >= 1000) {
-    postMessage({ t: 'perf', fps: accFrames * 1000 / (now - accT), cpu: acc / accFrames, draw3d: M.ccall('d2_draw_ms', 'number', [], []), skipped, frame });
+    postMessage({ t: 'perf', fps: accFrames * 1000 / (now - accT), cpu: acc / Math.max(1, accFrames), draw3d: M.ccall('d2_draw_ms', 'number', [], []), skipped, frame, net: link ? link.stats() : null });
+    if (link) { link.waits = 0; link.waitMs = 0; }
     skipped = 0;
     acc = 0; accFrames = 0; accT = now;
   }
-  timer = setTimeout(loop, Math.max(0, next - performance.now()));
+  // while waiting for the network, the next bundle's arrival restarts the loop (see 'net'); this timer is a backstop
+  timer = setTimeout(loop, waiting ? 30 : Math.max(0, next - performance.now()));
 }
 
 // Unthrottled: how many frames per second the core can do in this browser.

@@ -126,13 +126,14 @@
     <p class="hint">Daytona 2 conecta las cabinas con su placa de red original. Primero va a llegar el modo de dos ventanas en la misma computadora.</p></section></div>
 </aside>
 <aside id="rooms" class="drawer" hidden aria-label="Salas online">
-  <header><h2>SALAS ONLINE</h2><button class="x" data-close="rooms" aria-label="Cerrar">✕</button></header>
-  <div class="scroll"><section class="soon"><span class="soon-badge">PRÓXIMAMENTE</span>
-    <h3>Carreras de 2 a 6 jugadores</h3>
-    <p class="hint">Salas por internet usando el link de cabinas del arcade original.</p></section></div>
+  <header><h2>SALAS ONLINE <small>2 a 8</small></h2><button class="x" data-close="rooms" aria-label="Cerrar">✕</button></header>
+  <div class="scroll" id="roomsBody"></div>
 </aside>
+<div id="netBadge" class="badge" hidden></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+<script src="./config.js"></script>
 <script src="./app.js"></script>
+<script src="./online.js"></script>
 </body>
 </html>

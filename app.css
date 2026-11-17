@@ -128,3 +128,27 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 @media (max-width: 560px) { .logo .l1 { font-size: 44px; } .logo .l2 { font-size: 26px; } }
 @media (prefers-reduced-motion: reduce) { .lines, .btn.big, .hero, .drawer { animation: none; } }
 [hidden] { display: none !important; }
+
+/* ---------- salas online ---------- */
+.drawer h2 small { font: 700 11px system-ui; letter-spacing: 1px; color: var(--acc2); margin-left: 6px; }
+.room-list { display: grid; gap: 8px; margin: 8px 0; }
+.room { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 13px; background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--acc); border-radius: 10px; transition: .15s; }
+.room:hover { border-color: rgba(255,61,31,.6); transform: translateX(-2px); }
+.room b { display: block; } .room small { color: var(--dim); }
+.empty { color: var(--dim); text-align: center; padding: 14px 0; }
+.input { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); width: 100%; }
+.input:focus { outline: 2px solid rgba(255,61,31,.5); }
+.players { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+.players li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; }
+.players .num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--grad); color: #1a0800; font: italic 900 13px system-ui; margin-right: 8px; }
+.tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+.tag.ok { color: var(--ok); border-color: var(--ok); } .tag.host { color: var(--acc2); border-color: var(--acc2); } .tag.bad { color: var(--bad); border-color: var(--bad); }
+.chat { height: 150px; overflow: auto; background: #0b0c10; border: 1px solid var(--line); border-radius: 10px; padding: 8px; font-size: 13px; margin-bottom: 6px; }
+.chat .sys { color: var(--dim); font-style: italic; } .chat b { color: var(--acc2); }
+.code { font: 800 26px ui-monospace, monospace; letter-spacing: 6px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.notice { background: #1d1a10; border: 1px solid #4d4223; color: #e9d9a6; border-radius: 9px; padding: 8px 10px; font-size: 12px; margin: 8px 0; }
+.stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .stat span { color: var(--dim); }
+.badge { position: fixed; left: 12px; bottom: 12px; z-index: 20; padding: 5px 12px; border-radius: 999px; background: rgba(16,18,24,.85); border: 1px solid var(--line); font: 700 12px system-ui, sans-serif; backdrop-filter: blur(8px); transition: opacity .35s; }
+.badge .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; box-shadow: 0 0 8px var(--ok); }
+.badge.warn .dot { background: var(--acc2); box-shadow: 0 0 8px var(--acc2); } .badge.bad .dot { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+body.idle .badge { opacity: .55; }

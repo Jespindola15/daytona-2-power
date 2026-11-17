@@ -1,0 +1,12 @@
+{
+  "name": "daytona2-salas",
+  "private": true,
+  "description": "Salas online de Daytona USA 2 web: el cable de red del arcade, por internet",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}

@@ -1,0 +1,18 @@
+# Daytona USA 2 web — salas online (Cloudflare Workers + Durable Objects + WebSocket)
+#   npm run dev      (local, runtime real de Cloudflare)
+#   npm run deploy   (publica; usa tu sesión de `npx wrangler login`)
+name = "daytona2-salas"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+[[durable_objects.bindings]]
+name = "SALA"
+class_name = "Sala"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Sala", "Lobby"]

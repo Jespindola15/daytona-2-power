@@ -2,7 +2,7 @@
 // El núcleo (Supermodel → WebAssembly) corre en worker.js y dibuja en el canvas con WebGL2.
 'use strict';
 const $ = (id) => document.getElementById(id);
-const canvas = $('screen');
+let canvas = $('screen');   // se reemplaza al pasar a una carrera online (un OffscreenCanvas no se puede reusar)
 const BASE_W = 496, BASE_H = 384;          // resolución de la placa Model 3
 
 // ---------- ajustes persistentes ----------
@@ -81,16 +81,22 @@ addEventListener('pointerdown', () => audio?.ctx.resume());
 addEventListener('keydown', () => audio?.ctx.resume());
 
 // ---------- worker ----------
-let worker, running = false, paused = false;
-async function boot(zipBuf) {
+let worker, running = false, paused = false, lastRom = null, linkCfg = null;
+// linkCfg (online): { index, num, delay } — esta PC es la cabina index+1 de num en el cable de la sala
+async function boot(zipBuf, link = null) {
+  linkCfg = link;
+  lastRom = zipBuf.slice(0);           // copia: el original se transfiere al worker
+  window.__online?.booting(link);
   $('loadActions').hidden = true;
   loadState(`ROM lista (${(zipBuf.byteLength / 1048576).toFixed(0)} MB) · preparando…`, 0.35);
-  const saved = await kvGet('nvram');
+  // online: la configuración de cabina (LINK ID MASTER/SLAVE y número de auto) la generó el propio juego en su menú de servicio
+  const saved = link ? null : await kvGet('nvram');
+  const nvUrl = link ? `data/link/car${link.index + 1}.nv` : 'data/dayto2pe.nv';
   const [xml, nv] = await Promise.all([
     fetch('data/Games.xml').then((r) => r.arrayBuffer()),
-    saved ? Promise.resolve(saved.slice(0)) : fetch('data/dayto2pe.nv').then((r) => (r.ok ? r.arrayBuffer() : null)),
+    saved ? Promise.resolve(saved.slice(0)) : fetch(nvUrl).then((r) => (r.ok ? r.arrayBuffer() : null)),
   ]);
-  log(saved ? '[web] NVRAM: la guardada en este navegador' : '[web] NVRAM: inicial (USA, SINGLE)');
+  log(link ? `[web] NVRAM: cabina ${link.index + 1} (${link.index ? 'SLAVE' : 'MASTER'})` : saved ? '[web] NVRAM: la guardada en este navegador' : '[web] NVRAM: inicial (USA, SINGLE)');
   worker = new Worker('worker.js');
   curMult = resMult();
   const off = canvas.transferControlToOffscreen();
@@ -99,13 +105,28 @@ async function boot(zipBuf) {
     if (m.t === 'log') log(m.s);
     else if (m.t === 'stage') loadState(m.s, m.p);
     else if (m.t === 'frame') { if (m.pcm && audio && !paused) audio.node.port.postMessage(m.pcm, [m.pcm.buffer]); }
-    else if (m.t === 'perf') showPerf(m);
+    else if (m.t === 'perf') { showPerf(m); if (m.net) window.__online?.netStats(m.net, m); }
+    else if (m.t === 'netout') window.__online?.send(m.msg);
     else if (m.t === 'bench') { toast(`Velocidad máxima: ${m.fps.toFixed(0)} cuadros/s (${(m.fps / 57.524 * 100).toFixed(0)} %)`, 5000); log(`[bench] ${m.n} cuadros en ${m.ms.toFixed(0)} ms`); }
-    else if (m.t === 'nvram') kvSet('nvram', m.data.buffer);
+    else if (m.t === 'nvram') { if (!linkCfg) kvSet('nvram', m.data.buffer); }
     else if (m.t === 'ready') started();
     else if (m.t === 'fail') { loadState('No se pudo arrancar el juego. Mirá Ajustes → Diagnóstico.', 0); $('loadActions').hidden = false; }
   };
-  worker.postMessage({ t: 'boot', zip: zipBuf, xml, nv, canvas: off }, [zipBuf, off]);
+  worker.postMessage({ t: 'boot', zip: zipBuf, xml, nv, canvas: off, link }, [zipBuf, off]);
+}
+
+// Reinicia la placa con otra configuración (carrera online o vuelta a un jugador) sin recargar la página.
+async function reboot(link) {
+  if (!lastRom) { toast('Primero tiene que cargar el juego'); return false; }
+  if (worker) worker.terminate();
+  worker = null; running = false;
+  const fresh = canvas.cloneNode(false);           // canvas nuevo: el anterior quedó en manos del worker viejo
+  canvas.replaceWith(fresh); canvas = fresh;
+  document.body.classList.remove('playing');
+  $('loader').hidden = false; $('loader').classList.remove('ready');
+  paused = false; $('paused').hidden = true;
+  await boot(lastRom, link);
+  return true;
 }
 function started() {
   running = true; window.__ready = true;
@@ -201,6 +222,7 @@ async function autoLoadRom() {
 // ---------- pausa / pantalla completa / paneles ----------
 function setPause(p) {
   if (!running) return;
+  if (p && linkCfg) { toast('En una carrera online no se puede pausar: frenaría a todos'); return; }
   paused = p; worker.postMessage({ t: 'speed', on: !p });
   $('paused').hidden = !p; $('btnPause').textContent = p ? '▶' : '❚❚'; $('btnPause').setAttribute('aria-pressed', p);
   if (audio) p ? audio.ctx.suspend() : audio.ctx.resume();
