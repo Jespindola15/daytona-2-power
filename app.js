@@ -249,10 +249,15 @@ applyVolume();
 
 // ---------- teclado ----------
 const KEYS = { Digit1: 'KEY_1', Digit3: 'KEY_3', Digit5: 'KEY_5', Digit6: 'KEY_6', ArrowUp: 'KEY_UP', ArrowDown: 'KEY_DOWN',
-  ArrowLeft: 'KEY_LEFT', ArrowRight: 'KEY_RIGHT', KeyA: 'KEY_A', KeyS: 'KEY_S', KeyD: 'KEY_D', KeyF: 'KEY_F',
+  KeyA: 'KEY_A', KeyS: 'KEY_S', KeyD: 'KEY_D', KeyF: 'KEY_F',
   KeyQ: 'KEY_Q', KeyW: 'KEY_W', KeyE: 'KEY_E', KeyR: 'KEY_R' };
+const held = { left: false, right: false, gas: false, brake: false };
+const HELD_KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'gas', ArrowDown: 'brake' };
+addEventListener('keyup', (e) => { const h = HELD_KEYS[e.code]; if (h) held[h] = false; });
+addEventListener('blur', () => { for (const k in held) held[k] = false; });
 addEventListener('keydown', (e) => {
   if (e.target.closest?.('select, input')) return;
+  { const h = HELD_KEYS[e.code]; if (h) { held[h] = true; if (h === 'left' || h === 'right') { e.preventDefault(); return; } } }
   if (e.code === 'KeyP' && running) { setPause(!paused); return; }
   if (e.code === 'KeyM') { $('btnMute').click(); return; }
   if (e.code === 'F11') { e.preventDefault(); fullscreen(); return; }
@@ -266,6 +271,21 @@ addEventListener('keyup', (e) => { const k = KEYS[e.code]; if (k && worker) { wo
 // LB/RB = bajar/subir marcha: la caja de 4 marchas mantiene la marcha elegida, como la palanca H del mueble.
 let gear = 1, prevPad = {}, padId = '';
 const lastAx = {}, lastBt = {};
+// Volante virtual. En el mueble real los menús (pista, auto, AT/MT) se eligen por la POSICIÓN del volante:
+// si se suelta, vuelve al centro y la selección salta a otra opción. Por eso, mientras no se acelera ni
+// se frena (menús), el volante queda donde lo dejaste; al acelerar o frenar (carrera) vuelve solo al centro.
+let wheel = 0, lastWheelT = performance.now(), sentWheel = null;
+function updateWheel(padSx, padGas, padBrake) {
+  const now = performance.now(), dt = Math.min(0.1, (now - lastWheelT) / 1000); lastWheelT = now;
+  const kb = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+  const driving = held.gas || held.brake || padGas || padBrake;
+  if (padSx) wheel = padSx;                                        // palanca: posición directa
+  else if (kb) wheel = Math.max(-1, Math.min(1, wheel + kb * dt / 0.18 * (Math.sign(wheel) === -kb ? 2 : 1)));
+  else if (driving) wheel = Math.abs(wheel) < 0.02 ? 0 : wheel * Math.pow(0.002, dt);   // se centra en ~0,3 s
+  const v = Math.round(wheel * 32767);
+  if (v !== sentWheel && worker && running) { sentWheel = v; worker.postMessage({ t: 'joy', axes: [[0, v]], buttons: [] }); }
+}
+
 function pollPad() {
   const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
   const pad = opts.padIndex === 'auto' ? pads[0] : pads.find((p) => p.index === +opts.padIndex);
@@ -283,7 +303,8 @@ function pollPad() {
     const edge = (i) => btn(i).pressed && !prevPad[i];
     if (edge(4)) { gear = Math.max(1, gear - 1); toast(`Marcha ${gear}`, 800); }
     if (edge(5)) { gear = Math.min(4, gear + 1); toast(`Marcha ${gear}`, 800); }
-    const axes = { 0: Math.round(sx * 32767), 5: Math.round(btn(7).value * 32767), 2: Math.round(btn(6).value * 32767) };
+    padSteer = { sx, gas: btn(7).value > 0.1, brake: btn(6).value > 0.1 };
+    const axes = { 5: Math.round(btn(7).value * 32767), 2: Math.round(btn(6).value * 32767) };
     const buttons = { 0: btn(0).pressed, 1: btn(1).pressed, 2: btn(2).pressed, 3: btn(3).pressed,
       8: btn(9).pressed, 9: btn(8).pressed, 4: gear === 1, 5: gear === 2, 6: gear === 3, 7: gear === 4 };
     const ax = [], bt = [];
@@ -293,8 +314,11 @@ function pollPad() {
     if (btn(9).pressed && !prevPad[9] && paused) setPause(false);
     prevPad = Object.fromEntries(pad.buttons.map((b, i) => [i, b.pressed]));
   }
+  if (!pad) padSteer = { sx: 0, gas: false, brake: false };
+  updateWheel(padSteer.sx, padSteer.gas, padSteer.brake);
   requestAnimationFrame(pollPad);
 }
+let padSteer = { sx: 0, gas: false, brake: false };
 requestAnimationFrame(pollPad);
 layout();
 window.__send = (m) => worker?.postMessage(m);
